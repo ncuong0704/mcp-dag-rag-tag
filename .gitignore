@@ -1,0 +1,9 @@
+.env
+__pycache__/
+*.pyc
+.faiss_index/
+n8n_data/
+postgres_data/
+.venv/
+*.egg-info/
+.DS_Store

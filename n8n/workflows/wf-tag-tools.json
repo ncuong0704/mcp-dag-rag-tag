@@ -1,0 +1,473 @@
+{
+  "name": "wf-tag-tools",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "tag",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "tag00001-0000-4000-8000-000000000001",
+      "name": "Webhook TAG",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [240, 400],
+      "webhookId": "tag-tools-webhook"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "tq1",
+              "name": "query",
+              "value": "={{ $json.body?.query ?? $json.query ?? '' }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "tag00002-0000-4000-8000-000000000002",
+      "name": "Set Query",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [460, 400]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.groq.com/openai/v1/chat/completions",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"model\": \"llama-3.3-70b-versatile\",\n  \"temperature\": 0.1,\n  \"tool_choice\": \"auto\",\n  \"messages\": [\n    {\n      \"role\": \"system\",\n      \"content\": \"Bạn là trợ lý TAG (Tool-Augmented Generation). Chọn đúng một tool để trả lời câu hỏi tiếng Việt.\"\n    },\n    {\n      \"role\": \"user\",\n      \"content\": \"{{ $json.query }}\"\n    }\n  ],\n  \"tools\": [\n    {\n      \"type\": \"function\",\n      \"function\": {\n        \"name\": \"python_executor\",\n        \"description\": \"Chạy Python cho tính toán, thống kê, xử lý số liệu.\",\n        \"parameters\": {\n          \"type\": \"object\",\n          \"properties\": {\n            \"code\": { \"type\": \"string\", \"description\": \"Mã Python cần chạy\" }\n          },\n          \"required\": [\"code\"]\n        }\n      }\n    },\n    {\n      \"type\": \"function\",\n      \"function\": {\n        \"name\": \"web_search\",\n        \"description\": \"Tìm kiếm thông tin thời sự trên web.\",\n        \"parameters\": {\n          \"type\": \"object\",\n          \"properties\": {\n            \"query\": { \"type\": \"string\", \"description\": \"Truy vấn tìm kiếm\" },\n            \"max_results\": { \"type\": \"integer\", \"description\": \"Số kết quả tối đa\", \"default\": 5 }\n          },\n          \"required\": [\"query\"]\n        }\n      }\n    },\n    {\n      \"type\": \"function\",\n      \"function\": {\n        \"name\": \"sql_query\",\n        \"description\": \"Truy vấn dữ liệu bán hàng PostgreSQL qua workflow DAG.\",\n        \"parameters\": {\n          \"type\": \"object\",\n          \"properties\": {\n            \"question\": { \"type\": \"string\", \"description\": \"Câu hỏi tiếng Việt về dữ liệu\" }\n          },\n          \"required\": [\"question\"]\n        }\n      }\n    }\n  ]\n}",
+        "options": {}
+      },
+      "id": "tag00003-0000-4000-8000-000000000003",
+      "name": "Groq Select Tool",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [680, 400],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "GROQ_API_CREDENTIAL_ID",
+          "name": "Groq API"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const groq = $input.first().json;\nconst query = $('Set Query').first().json.query;\nconst msg = groq.choices?.[0]?.message ?? {};\n\nif (msg.tool_calls?.length) {\n  const tc = msg.tool_calls[0];\n  let args = {};\n  try {\n    args = JSON.parse(tc.function.arguments || '{}');\n  } catch (e) {\n    args = {};\n  }\n  return {\n    query,\n    tool: tc.function.name,\n    arguments: args,\n    directAnswer: null\n  };\n}\n\nreturn {\n  query,\n  tool: 'none',\n  arguments: {},\n  directAnswer: msg.content ?? null\n};"
+      },
+      "id": "tag00004-0000-4000-8000-000000000004",
+      "name": "Parse Tool Call",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [900, 400]
+    },
+    {
+      "parameters": {
+        "rules": {
+          "values": [
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict"
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json.tool }}",
+                    "rightValue": "python_executor",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "python_executor"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict"
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json.tool }}",
+                    "rightValue": "web_search",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "web_search"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict"
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json.tool }}",
+                    "rightValue": "sql_query",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "sql_query"
+            }
+          ]
+        },
+        "options": {
+          "fallbackOutput": "extra"
+        }
+      },
+      "id": "tag00005-0000-4000-8000-000000000005",
+      "name": "Switch Tool",
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 3.2,
+      "position": [1120, 400]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://api:8000/execute-python",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"code\": {{ JSON.stringify($('Parse Tool Call').item.json.arguments.code ?? '') }}\n}",
+        "options": {}
+      },
+      "id": "tag00006-0000-4000-8000-000000000006",
+      "name": "Execute Python",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1380, 160]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://api:8000/web-search",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"query\": {{ JSON.stringify($('Parse Tool Call').item.json.arguments.query ?? $('Parse Tool Call').item.json.query) }},\n  \"max_results\": {{ $('Parse Tool Call').item.json.arguments.max_results ?? 5 }}\n}",
+        "options": {}
+      },
+      "id": "tag00007-0000-4000-8000-000000000007",
+      "name": "Web Search",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1380, 400]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://n8n:5678/webhook/dag",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"query\": {{ JSON.stringify($('Parse Tool Call').item.json.arguments.question ?? $('Parse Tool Call').item.json.query) }}\n}",
+        "options": {}
+      },
+      "id": "tag00008-0000-4000-8000-000000000008",
+      "name": "Call DAG Webhook",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1380, 640]
+    },
+    {
+      "parameters": {
+        "jsCode": "const parsed = $('Parse Tool Call').first().json;\nreturn {\n  tool: parsed.tool,\n  query: parsed.query,\n  toolResult: { message: parsed.directAnswer ?? 'Không chọn được tool phù hợp.' },\n  arguments: parsed.arguments\n};"
+      },
+      "id": "tag00009-0000-4000-8000-000000000009",
+      "name": "No Tool Fallback",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1380, 880]
+    },
+    {
+      "parameters": {
+        "jsCode": "const parsed = $('Parse Tool Call').first().json;\nconst apiResult = $input.first().json;\nreturn {\n  tool: parsed.tool,\n  query: parsed.query,\n  arguments: parsed.arguments,\n  toolResult: apiResult\n};"
+      },
+      "id": "tag00010-0000-4000-8000-000000000010",
+      "name": "Merge Tool Result",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1620, 400]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.groq.com/openai/v1/chat/completions",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"model\": \"llama-3.3-70b-versatile\",\n  \"temperature\": 0.3,\n  \"messages\": [\n    {\n      \"role\": \"system\",\n      \"content\": \"Tổng hợp kết quả tool thành câu trả lời tiếng Việt ngắn gọn, chính xác.\"\n    },\n    {\n      \"role\": \"user\",\n      \"content\": \"Câu hỏi: {{ $json.query }}\\nTool: {{ $json.tool }}\\nKết quả tool (JSON): {{ JSON.stringify($json.toolResult) }}\"\n    }\n  ]\n}",
+        "options": {}
+      },
+      "id": "tag00011-0000-4000-8000-000000000011",
+      "name": "Groq Summarize",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1860, 400],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "GROQ_API_CREDENTIAL_ID",
+          "name": "Groq API"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const groq = $input.first().json;\nconst merged = $('Merge Tool Result').first().json;\nconst answer = groq.choices?.[0]?.message?.content ?? JSON.stringify(merged.toolResult);\n\nreturn {\n  mode: 'TAG',\n  query: merged.query,\n  tool: merged.tool,\n  answer,\n  toolResult: merged.toolResult\n};"
+      },
+      "id": "tag00012-0000-4000-8000-000000000012",
+      "name": "Prepare Response",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [2080, 400]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ $json }}",
+        "options": {}
+      },
+      "id": "tag00013-0000-4000-8000-000000000013",
+      "name": "Respond to Webhook",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [2300, 400]
+    }
+  ],
+  "connections": {
+    "Webhook TAG": {
+      "main": [
+        [
+          {
+            "node": "Set Query",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Set Query": {
+      "main": [
+        [
+          {
+            "node": "Groq Select Tool",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Groq Select Tool": {
+      "main": [
+        [
+          {
+            "node": "Parse Tool Call",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Parse Tool Call": {
+      "main": [
+        [
+          {
+            "node": "Switch Tool",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Switch Tool": {
+      "main": [
+        [
+          {
+            "node": "Execute Python",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Web Search",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Call DAG Webhook",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "No Tool Fallback",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Execute Python": {
+      "main": [
+        [
+          {
+            "node": "Merge Tool Result",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Web Search": {
+      "main": [
+        [
+          {
+            "node": "Merge Tool Result",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Call DAG Webhook": {
+      "main": [
+        [
+          {
+            "node": "Merge Tool Result",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "No Tool Fallback": {
+      "main": [
+        [
+          {
+            "node": "Merge Tool Result",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Merge Tool Result": {
+      "main": [
+        [
+          {
+            "node": "Groq Summarize",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Groq Summarize": {
+      "main": [
+        [
+          {
+            "node": "Prepare Response",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Prepare Response": {
+      "main": [
+        [
+          {
+            "node": "Respond to Webhook",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "versionId": "3c4d5e6f-7081-9012-cdef-123456789012",
+  "meta": {
+    "templateCredsSetupCompleted": false
+  },
+  "tags": []
+}

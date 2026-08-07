@@ -1,0 +1,215 @@
+{
+  "name": "wf-dag-sql",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "dag",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "f1a2b3c4-d5e6-4789-a012-3456789abcde",
+      "name": "Webhook DAG",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [240, 300],
+      "webhookId": "dag-sql-webhook"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "q1",
+              "name": "query",
+              "value": "={{ $json.body?.query ?? $json.query ?? '' }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "a2b3c4d5-e6f7-4890-b123-456789abcdef",
+      "name": "Set Query",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [460, 300]
+    },
+    {
+      "parameters": {
+        "jsCode": "const fs = require('fs');\nconst schemaPath = '/home/node/schema_registry.json';\nconst query = $('Set Query').first().json.query;\n\nlet schema;\ntry {\n  schema = JSON.parse(fs.readFileSync(schemaPath, 'utf8'));\n} catch (err) {\n  throw new Error('Không đọc được schema_registry.json: ' + err.message);\n}\n\nreturn {\n  query,\n  schemaText: JSON.stringify(schema, null, 2),\n  database: schema.database || 'cong_ty_ban_le',\n  retryCount: 0\n};"
+      },
+      "id": "b3c4d5e6-f7a8-4901-c234-56789abcdef0",
+      "name": "Load Schema",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [680, 300]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.groq.com/openai/v1/chat/completions",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"model\": \"llama-3.3-70b-versatile\",\n  \"temperature\": 0.1,\n  \"messages\": [\n    {\n      \"role\": \"system\",\n      \"content\": \"Bạn là chuyên gia SQL PostgreSQL. Chỉ sinh câu lệnh SELECT duy nhất, không markdown, không giải thích. Schema database:\\n{{ $json.schemaText }}\"\n    },\n    {\n      \"role\": \"user\",\n      \"content\": \"Câu hỏi tiếng Việt: {{ $json.query }}\"\n    }\n  ]\n}",
+        "options": {}
+      },
+      "id": "c4d5e6f7-a8b9-4012-d345-6789abcdef01",
+      "name": "Groq Generate SQL",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [900, 300],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "GROQ_API_CREDENTIAL_ID",
+          "name": "Groq API"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const raw = $input.first().json.choices?.[0]?.message?.content ?? $input.first().json.sql ?? '';\nconst sql = String(raw).replace(/```sql/gi, '').replace(/```/g, '').trim();\nconst forbidden = /\\b(DROP|DELETE|UPDATE|INSERT|ALTER|TRUNCATE|CREATE|GRANT|REVOKE|EXECUTE)\\b/i;\nconst ctx = $('Load Schema').first().json;\nconst retryCtx = $('Prepare SQL Retry').isExecuted ? $('Prepare SQL Retry').first().json : null;\n\nif (!sql) {\n  throw new Error('Groq không trả về SQL.');\n}\nif (forbidden.test(sql)) {\n  throw new Error('Chỉ cho phép truy vấn SELECT. Phát hiện lệnh bị cấm.');\n}\nif (!/^\\s*SELECT\\b/i.test(sql)) {\n  throw new Error('Chỉ cho phép truy vấn SELECT.');\n}\n\nreturn {\n  sql,\n  query: retryCtx?.query ?? ctx.query,\n  schemaText: ctx.schemaText,\n  retryCount: retryCtx?.retryCount ?? 0\n};"
+      },
+      "id": "d5e6f7a8-b9c0-4123-e456-789abcdef012",
+      "name": "Validate SQL",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1120, 300]
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "={{ $json.sql }}",
+        "options": {}
+      },
+      "id": "e6f7a8b9-c0d1-4234-f567-89abcdef0123",
+      "name": "Postgres Execute",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.5,
+      "position": [1340, 300],
+      "onError": "continueErrorOutput",
+      "credentials": {
+        "postgres": {
+          "id": "POSTGRES_CREDENTIAL_ID",
+          "name": "Postgres MCP"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const errItem = $input.first().json;\nconst validated = $('Validate SQL').first().json;\nconst loadSchema = $('Load Schema').first().json;\nconst retryCount = (validated.retryCount ?? 0) + 1;\n\nif (retryCount > 2) {\n  throw new Error('SQL vẫn lỗi sau 2 lần sửa: ' + (errItem.error?.message ?? errItem.message ?? JSON.stringify(errItem)));\n}\n\nconst pgError = errItem.error?.message ?? errItem.message ?? 'Unknown PostgreSQL error';\n\nreturn {\n  query: validated.query ?? loadSchema.query,\n  sql: validated.sql,\n  schemaText: loadSchema.schemaText,\n  retryCount,\n  pgError\n};"
+      },
+      "id": "c2d3e4f5-a6b7-4890-c123-456789abcd02",
+      "name": "Prepare SQL Retry",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1780, 480]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.groq.com/openai/v1/chat/completions",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"model\": \"llama-3.3-70b-versatile\",\n  \"temperature\": 0.1,\n  \"messages\": [\n    {\n      \"role\": \"system\",\n      \"content\": \"Bạn là chuyên gia SQL PostgreSQL. Sửa câu SELECT bị lỗi. Chỉ trả về SQL đã sửa, không markdown. Schema:\\n{{ $json.schemaText }}\"\n    },\n    {\n      \"role\": \"user\",\n      \"content\": \"Câu hỏi: {{ $json.query }}\\nSQL lỗi: {{ $json.sql }}\\nLỗi PostgreSQL: {{ $json.pgError }}\\nLần thử: {{ $json.retryCount }}/2\"\n    }\n  ]\n}",
+        "options": {}
+      },
+      "id": "d3e4f5a6-b7c8-4901-d234-56789abcde03",
+      "name": "Groq Fix SQL",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [2000, 480],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "GROQ_API_CREDENTIAL_ID",
+          "name": "Groq API"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const items = $input.all().map(i => i.json);\nconst query = $('Validate SQL').first().json.query;\nconst sql = $('Validate SQL').first().json.sql;\n\nif (!items.length || items[0].error) {\n  return {\n    query,\n    sql,\n    markdown: 'Không có kết quả.',\n    summary: 'Truy vấn không trả về dòng dữ liệu nào.'\n  };\n}\n\nconst keys = Object.keys(items[0]);\nconst header = '| ' + keys.join(' | ') + ' |';\nconst sep = '| ' + keys.map(() => '---').join(' | ') + ' |';\nconst rows = items.map(row => '| ' + keys.map(k => String(row[k] ?? '')).join(' | ') + ' |');\nconst markdown = [header, sep, ...rows].join('\\n');\n\nreturn {\n  query,\n  sql,\n  rowCount: items.length,\n  markdown,\n  summary: `Tìm thấy ${items.length} dòng kết quả cho câu hỏi: ${query}`\n};"
+      },
+      "id": "f7a8b9c0-d1e2-4345-a678-9abcdef01234",
+      "name": "Format Markdown Table",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1780, 180]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ { mode: 'DAG', query: $json.query, sql: $json.sql, rowCount: $json.rowCount ?? 0, markdown: $json.markdown, summary: $json.summary } }}",
+        "options": {}
+      },
+      "id": "a8b9c0d1-e2f3-4456-b789-abcdef012345",
+      "name": "Respond to Webhook",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [2000, 180]
+    }
+  ],
+  "connections": {
+    "Webhook DAG": {
+      "main": [[{ "node": "Set Query", "type": "main", "index": 0 }]]
+    },
+    "Set Query": {
+      "main": [[{ "node": "Load Schema", "type": "main", "index": 0 }]]
+    },
+    "Load Schema": {
+      "main": [[{ "node": "Groq Generate SQL", "type": "main", "index": 0 }]]
+    },
+    "Groq Generate SQL": {
+      "main": [[{ "node": "Validate SQL", "type": "main", "index": 0 }]]
+    },
+    "Validate SQL": {
+      "main": [[{ "node": "Postgres Execute", "type": "main", "index": 0 }]]
+    },
+    "Postgres Execute": {
+      "main": [
+        [{ "node": "Format Markdown Table", "type": "main", "index": 0 }],
+        [{ "node": "Prepare SQL Retry", "type": "main", "index": 0 }]
+      ]
+    },
+    "Prepare SQL Retry": {
+      "main": [[{ "node": "Groq Fix SQL", "type": "main", "index": 0 }]]
+    },
+    "Groq Fix SQL": {
+      "main": [[{ "node": "Validate SQL", "type": "main", "index": 0 }]]
+    },
+    "Format Markdown Table": {
+      "main": [[{ "node": "Respond to Webhook", "type": "main", "index": 0 }]]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "versionId": "2b3c4d5e-6f70-8901-bcde-f12345678902",
+  "meta": {
+    "templateCredsSetupCompleted": false
+  },
+  "tags": []
+}
