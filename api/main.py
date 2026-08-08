@@ -1,9 +1,18 @@
 import os
 
+import httpx
 from fastapi import FastAPI, HTTPException
+from fastapi.responses import FileResponse, HTMLResponse
 from pydantic import BaseModel, Field
 
 app = FastAPI(title="MCP API", version="1.0.0")
+
+N8N_URL = os.getenv("N8N_URL", "http://n8n:5678")
+STATIC_DIR = os.path.join(os.path.dirname(__file__), "static")
+
+
+class ChatRequest(BaseModel):
+    query: str
 
 
 class HealthResponse(BaseModel):
@@ -92,3 +101,19 @@ def web_search_endpoint(req: WebSearchRequest) -> dict:
     from tools.web_search import web_search
 
     return {"snippets": web_search(req.query, req.max_results)}
+
+
+@app.get("/", response_class=HTMLResponse)
+def chat_ui() -> FileResponse:
+    return FileResponse(os.path.join(STATIC_DIR, "index.html"))
+
+
+@app.post("/chat")
+async def chat_endpoint(req: ChatRequest) -> dict:
+    async with httpx.AsyncClient(timeout=60) as client:
+        try:
+            resp = await client.post(f"{N8N_URL}/webhook/chat", json={"query": req.query})
+            resp.raise_for_status()
+            return resp.json()
+        except httpx.HTTPError as exc:
+            raise HTTPException(status_code=502, detail=f"Lỗi gọi N8N: {exc}") from exc

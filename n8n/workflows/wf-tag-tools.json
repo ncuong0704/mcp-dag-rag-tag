@@ -12,7 +12,10 @@
       "name": "Webhook TAG",
       "type": "n8n-nodes-base.webhook",
       "typeVersion": 2,
-      "position": [240, 400],
+      "position": [
+        240,
+        400
+      ],
       "webhookId": "tag-tools-webhook"
     },
     {
@@ -33,7 +36,10 @@
       "name": "Set Query",
       "type": "n8n-nodes-base.set",
       "typeVersion": 3.4,
-      "position": [460, 400]
+      "position": [
+        460,
+        400
+      ]
     },
     {
       "parameters": {
@@ -59,7 +65,10 @@
       "name": "Groq Select Tool",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
-      "position": [680, 400],
+      "position": [
+        680,
+        400
+      ],
       "credentials": {
         "httpHeaderAuth": {
           "id": "GROQ_API_CREDENTIAL_ID",
@@ -69,13 +78,16 @@
     },
     {
       "parameters": {
-        "jsCode": "const groq = $input.first().json;\nconst query = $('Set Query').first().json.query;\nconst msg = groq.choices?.[0]?.message ?? {};\n\nif (msg.tool_calls?.length) {\n  const tc = msg.tool_calls[0];\n  let args = {};\n  try {\n    args = JSON.parse(tc.function.arguments || '{}');\n  } catch (e) {\n    args = {};\n  }\n  return {\n    query,\n    tool: tc.function.name,\n    arguments: args,\n    directAnswer: null\n  };\n}\n\nreturn {\n  query,\n  tool: 'none',\n  arguments: {},\n  directAnswer: msg.content ?? null\n};"
+        "jsCode": "const groq = $input.first().json;\nconst query = $('Set Query').first().json.query;\nconst msg = groq.choices?.[0]?.message ?? {};\n\nif (msg.tool_calls?.length) {\n  const tc = msg.tool_calls[0];\n  let args = {};\n  try {\n    args = JSON.parse(tc.function['arguments'] || '{}');\n  } catch (e) {\n    args = {};\n  }\n  return {\n    query,\n    tool: tc.function.name,\n    toolArgs: args,\n    directAnswer: null\n  };\n}\n\nreturn {\n  query,\n  tool: 'none',\n  toolArgs: {},\n  directAnswer: msg.content ?? null\n};"
       },
       "id": "tag00004-0000-4000-8000-000000000004",
       "name": "Parse Tool Call",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
-      "position": [900, 400]
+      "position": [
+        900,
+        400
+      ]
     },
     {
       "parameters": {
@@ -157,7 +169,10 @@
       "name": "Switch Tool",
       "type": "n8n-nodes-base.switch",
       "typeVersion": 3.2,
-      "position": [1120, 400]
+      "position": [
+        1120,
+        400
+      ]
     },
     {
       "parameters": {
@@ -174,14 +189,17 @@
         },
         "sendBody": true,
         "specifyBody": "json",
-        "jsonBody": "={\n  \"code\": {{ JSON.stringify($('Parse Tool Call').item.json.arguments.code ?? '') }}\n}",
+        "jsonBody": "={\n  \"code\": {{ JSON.stringify($('Parse Tool Call').item.json.toolArgs.code ?? '') }}\n}",
         "options": {}
       },
       "id": "tag00006-0000-4000-8000-000000000006",
       "name": "Execute Python",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
-      "position": [1380, 160]
+      "position": [
+        1380,
+        160
+      ]
     },
     {
       "parameters": {
@@ -198,14 +216,17 @@
         },
         "sendBody": true,
         "specifyBody": "json",
-        "jsonBody": "={\n  \"query\": {{ JSON.stringify($('Parse Tool Call').item.json.arguments.query ?? $('Parse Tool Call').item.json.query) }},\n  \"max_results\": {{ $('Parse Tool Call').item.json.arguments.max_results ?? 5 }}\n}",
+        "jsonBody": "={\n  \"query\": {{ JSON.stringify($('Parse Tool Call').item.json.toolArgs.query ?? $('Parse Tool Call').item.json.query) }},\n  \"max_results\": {{ $('Parse Tool Call').item.json.toolArgs.max_results ?? 5 }}\n}",
         "options": {}
       },
       "id": "tag00007-0000-4000-8000-000000000007",
       "name": "Web Search",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
-      "position": [1380, 400]
+      "position": [
+        1380,
+        400
+      ]
     },
     {
       "parameters": {
@@ -222,34 +243,43 @@
         },
         "sendBody": true,
         "specifyBody": "json",
-        "jsonBody": "={\n  \"query\": {{ JSON.stringify($('Parse Tool Call').item.json.arguments.question ?? $('Parse Tool Call').item.json.query) }}\n}",
+        "jsonBody": "={\n  \"query\": {{ JSON.stringify($('Parse Tool Call').item.json.toolArgs.question ?? $('Parse Tool Call').item.json.query) }}\n}",
         "options": {}
       },
       "id": "tag00008-0000-4000-8000-000000000008",
       "name": "Call DAG Webhook",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
-      "position": [1380, 640]
+      "position": [
+        1380,
+        640
+      ]
     },
     {
       "parameters": {
-        "jsCode": "const parsed = $('Parse Tool Call').first().json;\nreturn {\n  tool: parsed.tool,\n  query: parsed.query,\n  toolResult: { message: parsed.directAnswer ?? 'Không chọn được tool phù hợp.' },\n  arguments: parsed.arguments\n};"
+        "jsCode": "const parsed = $('Parse Tool Call').first().json;\nreturn {\n  tool: parsed.tool,\n  query: parsed.query,\n  toolResult: { message: parsed.directAnswer ?? 'Không chọn được tool phù hợp.' },\n  toolArgs: parsed.toolArgs\n};"
       },
       "id": "tag00009-0000-4000-8000-000000000009",
       "name": "No Tool Fallback",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
-      "position": [1380, 880]
+      "position": [
+        1380,
+        880
+      ]
     },
     {
       "parameters": {
-        "jsCode": "const parsed = $('Parse Tool Call').first().json;\nconst apiResult = $input.first().json;\nreturn {\n  tool: parsed.tool,\n  query: parsed.query,\n  arguments: parsed.arguments,\n  toolResult: apiResult\n};"
+        "jsCode": "const parsed = $('Parse Tool Call').first().json;\nconst apiResult = $input.first().json;\nreturn {\n  tool: parsed.tool,\n  query: parsed.query,\n  toolArgs: parsed.toolArgs,\n  toolResult: apiResult\n};"
       },
       "id": "tag00010-0000-4000-8000-000000000010",
       "name": "Merge Tool Result",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
-      "position": [1620, 400]
+      "position": [
+        1620,
+        400
+      ]
     },
     {
       "parameters": {
@@ -268,14 +298,17 @@
         },
         "sendBody": true,
         "specifyBody": "json",
-        "jsonBody": "={\n  \"model\": \"llama-3.3-70b-versatile\",\n  \"temperature\": 0.3,\n  \"messages\": [\n    {\n      \"role\": \"system\",\n      \"content\": \"Tổng hợp kết quả tool thành câu trả lời tiếng Việt ngắn gọn, chính xác.\"\n    },\n    {\n      \"role\": \"user\",\n      \"content\": \"Câu hỏi: {{ $json.query }}\\nTool: {{ $json.tool }}\\nKết quả tool (JSON): {{ JSON.stringify($json.toolResult) }}\"\n    }\n  ]\n}",
+        "jsonBody": "={\n  \"model\": \"llama-3.3-70b-versatile\",\n  \"temperature\": 0.3,\n  \"messages\": [\n    {\n      \"role\": \"system\",\n      \"content\": \"Tổng hợp kết quả tool thành câu trả lời tiếng Việt ngắn gọn, chính xác.\"\n    },\n    {\n      \"role\": \"user\",\n      \"content\": \"Câu hỏi: {{ $json.query }}\\nTool: {{ $json.tool }}\\nKết quả tool (JSON): {{ JSON.stringify(JSON.stringify($json.toolResult)).slice(1, -1) }}\"\n    }\n  ]\n}",
         "options": {}
       },
       "id": "tag00011-0000-4000-8000-000000000011",
       "name": "Groq Summarize",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
-      "position": [1860, 400],
+      "position": [
+        1860,
+        400
+      ],
       "credentials": {
         "httpHeaderAuth": {
           "id": "GROQ_API_CREDENTIAL_ID",
@@ -291,7 +324,10 @@
       "name": "Prepare Response",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
-      "position": [2080, 400]
+      "position": [
+        2080,
+        400
+      ]
     },
     {
       "parameters": {
@@ -303,7 +339,10 @@
       "name": "Respond to Webhook",
       "type": "n8n-nodes-base.respondToWebhook",
       "typeVersion": 1.1,
-      "position": [2300, 400]
+      "position": [
+        2300,
+        400
+      ]
     }
   ],
   "connections": {

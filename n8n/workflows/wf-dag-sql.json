@@ -12,7 +12,10 @@
       "name": "Webhook DAG",
       "type": "n8n-nodes-base.webhook",
       "typeVersion": 2,
-      "position": [240, 300],
+      "position": [
+        240,
+        300
+      ],
       "webhookId": "dag-sql-webhook"
     },
     {
@@ -33,17 +36,23 @@
       "name": "Set Query",
       "type": "n8n-nodes-base.set",
       "typeVersion": 3.4,
-      "position": [460, 300]
+      "position": [
+        460,
+        300
+      ]
     },
     {
       "parameters": {
-        "jsCode": "const fs = require('fs');\nconst schemaPath = '/home/node/schema_registry.json';\nconst query = $('Set Query').first().json.query;\n\nlet schema;\ntry {\n  schema = JSON.parse(fs.readFileSync(schemaPath, 'utf8'));\n} catch (err) {\n  throw new Error('Không đọc được schema_registry.json: ' + err.message);\n}\n\nreturn {\n  query,\n  schemaText: JSON.stringify(schema, null, 2),\n  database: schema.database || 'cong_ty_ban_le',\n  retryCount: 0\n};"
+        "jsCode": "const query = $('Set Query').first().json.query;\n\nconst schema = {\n  \"database\": \"cong_ty_ban_le\",\n  \"description\": \"Hệ thống quản lý bán hàng doanh nghiệp Việt Nam\",\n  \"tables\": {\n    \"san_pham\": {\n      \"description\": \"Danh mục sản phẩm\",\n      \"columns\": {\n        \"ma_sp\": \"Mã sản phẩm (INTEGER, PK)\",\n        \"ten_sp\": \"Tên sản phẩm\",\n        \"danh_muc\": \"Danh mục: Điện tử, Thực phẩm, Gia dụng, Văn phòng phẩm\",\n        \"gia_ban\": \"Giá bán đề xuất (NUMERIC)\"\n      }\n    },\n    \"khach_hang\": {\n      \"description\": \"Thông tin khách hàng\",\n      \"columns\": {\n        \"ma_kh\": \"Mã khách hàng (INTEGER, PK)\",\n        \"ten_kh\": \"Tên khách hàng\",\n        \"thanh_pho\": \"Thành phố: Hà Nội, TP.HCM, Đà Nẵng, Cần Thơ, Hải Phòng\",\n        \"loai_kh\": \"Loại: Cá nhân, Doanh nghiệp\"\n      }\n    },\n    \"don_hang\": {\n      \"description\": \"Đơn hàng của khách hàng\",\n      \"columns\": {\n        \"ma_dh\": \"Mã đơn hàng (INTEGER, PK)\",\n        \"ma_kh\": \"FK → khach_hang.ma_kh\",\n        \"ma_nv\": \"FK → nhan_vien.ma_nv\",\n        \"ngay_dat\": \"Ngày đặt hàng (DATE)\",\n        \"trang_thai\": \"Trạng thái: Đã giao, Đang xử lý, Hủy\"\n      }\n    },\n    \"chi_tiet_don_hang\": {\n      \"description\": \"Chi tiết từng dòng trong đơn hàng\",\n      \"columns\": {\n        \"id\": \"Mã chi tiết (INTEGER, PK)\",\n        \"ma_dh\": \"FK → don_hang.ma_dh\",\n        \"ma_sp\": \"FK → san_pham.ma_sp\",\n        \"so_luong\": \"Số lượng\",\n        \"don_gia\": \"Đơn giá tại thời điểm bán (NUMERIC)\"\n      }\n    },\n    \"nhan_vien\": {\n      \"description\": \"Nhân viên bán hàng\",\n      \"columns\": {\n        \"ma_nv\": \"Mã nhân viên (INTEGER, PK)\",\n        \"ten_nv\": \"Tên nhân viên\",\n        \"phong_ban\": \"Phòng ban: Kinh doanh, Marketing, Chăm sóc khách hàng\"\n      }\n    }\n  },\n  \"notes\": [\n    \"Doanh thu = SUM(chi_tiet_don_hang.so_luong * chi_tiet_don_hang.don_gia)\",\n    \"Quý 1 = tháng 1-3, Quý 2 = tháng 4-6, Quý 3 = tháng 7-9, Quý 4 = tháng 10-12\",\n    \"Chỉ sinh câu SELECT PostgreSQL, không dùng DELETE/UPDATE/INSERT/DROP\",\n    \"Khi tính doanh thu theo quý, JOIN don_hang với chi_tiet_don_hang qua ma_dh\"\n  ]\n};\n\nreturn {\n  query,\n  schemaText: JSON.stringify(JSON.stringify(schema)).slice(1, -1),\n  database: schema.database || 'cong_ty_ban_le',\n  retryCount: 0\n};\n"
       },
       "id": "b3c4d5e6-f7a8-4901-c234-56789abcdef0",
       "name": "Load Schema",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
-      "position": [680, 300]
+      "position": [
+        680,
+        300
+      ]
     },
     {
       "parameters": {
@@ -69,7 +78,10 @@
       "name": "Groq Generate SQL",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
-      "position": [900, 300],
+      "position": [
+        900,
+        300
+      ],
       "credentials": {
         "httpHeaderAuth": {
           "id": "GROQ_API_CREDENTIAL_ID",
@@ -85,7 +97,10 @@
       "name": "Validate SQL",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
-      "position": [1120, 300]
+      "position": [
+        1120,
+        300
+      ]
     },
     {
       "parameters": {
@@ -97,7 +112,10 @@
       "name": "Postgres Execute",
       "type": "n8n-nodes-base.postgres",
       "typeVersion": 2.5,
-      "position": [1340, 300],
+      "position": [
+        1340,
+        300
+      ],
       "onError": "continueErrorOutput",
       "credentials": {
         "postgres": {
@@ -114,7 +132,10 @@
       "name": "Prepare SQL Retry",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
-      "position": [1780, 480]
+      "position": [
+        1780,
+        480
+      ]
     },
     {
       "parameters": {
@@ -140,7 +161,10 @@
       "name": "Groq Fix SQL",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
-      "position": [2000, 480],
+      "position": [
+        2000,
+        480
+      ],
       "credentials": {
         "httpHeaderAuth": {
           "id": "GROQ_API_CREDENTIAL_ID",
@@ -156,7 +180,10 @@
       "name": "Format Markdown Table",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
-      "position": [1780, 180]
+      "position": [
+        1780,
+        180
+      ]
     },
     {
       "parameters": {
@@ -168,39 +195,118 @@
       "name": "Respond to Webhook",
       "type": "n8n-nodes-base.respondToWebhook",
       "typeVersion": 1.1,
-      "position": [2000, 180]
+      "position": [
+        2000,
+        180
+      ]
     }
   ],
   "connections": {
     "Webhook DAG": {
-      "main": [[{ "node": "Set Query", "type": "main", "index": 0 }]]
+      "main": [
+        [
+          {
+            "node": "Set Query",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
     },
     "Set Query": {
-      "main": [[{ "node": "Load Schema", "type": "main", "index": 0 }]]
+      "main": [
+        [
+          {
+            "node": "Load Schema",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
     },
     "Load Schema": {
-      "main": [[{ "node": "Groq Generate SQL", "type": "main", "index": 0 }]]
+      "main": [
+        [
+          {
+            "node": "Groq Generate SQL",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
     },
     "Groq Generate SQL": {
-      "main": [[{ "node": "Validate SQL", "type": "main", "index": 0 }]]
+      "main": [
+        [
+          {
+            "node": "Validate SQL",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
     },
     "Validate SQL": {
-      "main": [[{ "node": "Postgres Execute", "type": "main", "index": 0 }]]
+      "main": [
+        [
+          {
+            "node": "Postgres Execute",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
     },
     "Postgres Execute": {
       "main": [
-        [{ "node": "Format Markdown Table", "type": "main", "index": 0 }],
-        [{ "node": "Prepare SQL Retry", "type": "main", "index": 0 }]
+        [
+          {
+            "node": "Format Markdown Table",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Prepare SQL Retry",
+            "type": "main",
+            "index": 0
+          }
+        ]
       ]
     },
     "Prepare SQL Retry": {
-      "main": [[{ "node": "Groq Fix SQL", "type": "main", "index": 0 }]]
+      "main": [
+        [
+          {
+            "node": "Groq Fix SQL",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
     },
     "Groq Fix SQL": {
-      "main": [[{ "node": "Validate SQL", "type": "main", "index": 0 }]]
+      "main": [
+        [
+          {
+            "node": "Validate SQL",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
     },
     "Format Markdown Table": {
-      "main": [[{ "node": "Respond to Webhook", "type": "main", "index": 0 }]]
+      "main": [
+        [
+          {
+            "node": "Respond to Webhook",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
     }
   },
   "active": false,

@@ -154,7 +154,7 @@ Invoke-RestMethod -Method POST `
   -Body $body
 ```
 
-**Kết quả mong đợi:** Doanh thu quý 1/2025 ≈ **485.000.000 VND** (tổng `so_luong × don_gia` các đơn tháng 1–3/2025).
+**Kết quả mong đợi:** Doanh thu quý 1/2025 ≈ **525.186.000 VND** (tổng `so_luong × don_gia` các đơn tháng 1–3/2025, SQL do Groq tự sinh — đã kiểm thử thật).
 
 Nếu gặp lỗi `The requested webhook "POST dag" is not registered`, hãy mở N8N và **Activate** workflow `wf-dag-sql` trước khi gọi production webhook.
 

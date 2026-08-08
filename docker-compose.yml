@@ -25,12 +25,15 @@ services:
       HUGGINGFACE_API_KEY: ${HUGGINGFACE_API_KEY}
       HF_EMBED_MODEL: sentence-transformers/all-MiniLM-L6-v2
       LOCAL_EMBED_MODEL: sentence-transformers/all-MiniLM-L6-v2
-      EMBED_PROVIDER: local
+      EMBED_PROVIDER: huggingface
       FAISS_INDEX_PATH: /data/faiss_index
       DOCUMENTS_PATH: /data/documents
+      HF_HUB_DISABLE_XET: "1"
+      N8N_URL: http://n8n:5678
     volumes:
       - ./data/documents:/data/documents:ro
       - faiss_index:/data/faiss_index
+      - hf_cache:/root/.cache/huggingface
     depends_on:
       postgres:
         condition: service_healthy
@@ -56,3 +59,4 @@ volumes:
   postgres_data:
   faiss_index:
   n8n_data:
+  hf_cache:

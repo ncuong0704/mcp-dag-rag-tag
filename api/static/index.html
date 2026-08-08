@@ -1,0 +1,280 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Chatbot Doanh Nghiệp — DAG/RAG/TAG</title>
+<style>
+  :root {
+    --bg: #0f1115;
+    --panel: #171a21;
+    --border: #2a2f3a;
+    --text: #e6e8ee;
+    --muted: #8b93a5;
+    --accent: #6c8cff;
+    --user-bubble: #2b3550;
+    --bot-bubble: #1d2230;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    height: 100vh;
+    display: flex;
+    flex-direction: column;
+  }
+  header {
+    padding: 16px 24px;
+    border-bottom: 1px solid var(--border);
+    background: var(--panel);
+  }
+  header h1 { margin: 0; font-size: 18px; }
+  header p { margin: 4px 0 0; color: var(--muted); font-size: 13px; }
+  .badges { display: flex; gap: 8px; margin-top: 8px; }
+  .badge {
+    font-size: 11px;
+    padding: 3px 8px;
+    border-radius: 999px;
+    border: 1px solid var(--border);
+    color: var(--muted);
+  }
+  #chat {
+    flex: 1;
+    overflow-y: auto;
+    padding: 24px;
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+    max-width: 820px;
+    width: 100%;
+    margin: 0 auto;
+  }
+  .msg { display: flex; flex-direction: column; max-width: 75%; }
+  .msg.user { align-self: flex-end; align-items: flex-end; }
+  .msg.bot { align-self: flex-start; align-items: flex-start; }
+  .bubble {
+    padding: 10px 14px;
+    border-radius: 14px;
+    line-height: 1.5;
+    white-space: pre-wrap;
+    word-wrap: break-word;
+  }
+  .msg.user .bubble { background: var(--user-bubble); border-bottom-right-radius: 4px; }
+  .msg.bot .bubble { background: var(--bot-bubble); border-bottom-left-radius: 4px; }
+  .meta { font-size: 11px; color: var(--muted); margin-top: 4px; }
+  .route-tag {
+    display: inline-block;
+    font-size: 10px;
+    font-weight: 600;
+    padding: 2px 7px;
+    border-radius: 999px;
+    margin-bottom: 6px;
+    letter-spacing: 0.03em;
+  }
+  .route-DAG { background: #2a4a3a; color: #7fe3a3; }
+  .route-RAG { background: #2a3a4a; color: #7fb3e3; }
+  .route-TAG { background: #4a3a2a; color: #e3b37f; }
+  .route-HYBRID { background: #3a2a4a; color: #c37fe3; }
+  table { border-collapse: collapse; margin-top: 8px; font-size: 13px; }
+  th, td { border: 1px solid var(--border); padding: 4px 10px; text-align: left; }
+  th { color: var(--muted); }
+  .sources { margin-top: 8px; font-size: 12px; color: var(--muted); }
+  .sources span { display: inline-block; background: var(--panel); border: 1px solid var(--border); border-radius: 6px; padding: 2px 8px; margin: 2px 4px 2px 0; }
+  #inputBar {
+    border-top: 1px solid var(--border);
+    background: var(--panel);
+    padding: 14px 24px;
+  }
+  #form {
+    max-width: 820px;
+    margin: 0 auto;
+    display: flex;
+    gap: 10px;
+  }
+  #query {
+    flex: 1;
+    padding: 12px 14px;
+    border-radius: 10px;
+    border: 1px solid var(--border);
+    background: #10131a;
+    color: var(--text);
+    font-size: 14px;
+    outline: none;
+  }
+  #query:focus { border-color: var(--accent); }
+  button {
+    padding: 12px 20px;
+    border-radius: 10px;
+    border: none;
+    background: var(--accent);
+    color: white;
+    font-weight: 600;
+    cursor: pointer;
+    font-size: 14px;
+  }
+  button:disabled { opacity: 0.5; cursor: default; }
+  .examples { display: flex; flex-wrap: wrap; gap: 6px; max-width: 820px; margin: 10px auto 0; }
+  .example {
+    font-size: 12px;
+    padding: 5px 10px;
+    border: 1px solid var(--border);
+    border-radius: 999px;
+    color: var(--muted);
+    cursor: pointer;
+    background: transparent;
+  }
+  .example:hover { border-color: var(--accent); color: var(--text); }
+  .loading { color: var(--muted); font-style: italic; }
+</style>
+</head>
+<body>
+<header>
+  <h1>Chatbot Doanh Nghiệp — Công ty Bán Lẻ</h1>
+  <p>DAG (SQL) · RAG (Tài liệu) · TAG (Công cụ) · Hybrid Router — mọi câu hỏi tự động phân loại</p>
+  <div class="badges">
+    <span class="badge">N8N Master Router</span>
+    <span class="badge">Groq llama-3.3-70b</span>
+    <span class="badge">PostgreSQL + FAISS</span>
+  </div>
+</header>
+
+<div id="chat"></div>
+
+<div class="examples" id="examples">
+  <button class="example" data-q="Doanh thu quý 1 năm 2025 là bao nhiêu?">Doanh thu quý 1 2025?</button>
+  <button class="example" data-q="Top 5 sản phẩm bán chạy nhất?">Top 5 sản phẩm bán chạy?</button>
+  <button class="example" data-q="Điều khoản hợp đồng về thanh toán là gì?">Điều khoản thanh toán?</button>
+  <button class="example" data-q="Nhân viên được nghỉ phép bao nhiêu ngày một năm?">Nghỉ phép bao nhiêu ngày?</button>
+  <button class="example" data-q="Tính trung bình cộng: 120, 150, 180 triệu">Tính trung bình 3 số</button>
+</div>
+
+<div id="inputBar">
+  <form id="form">
+    <input id="query" type="text" placeholder="Nhập câu hỏi tiếng Việt..." autocomplete="off" />
+    <button id="sendBtn" type="submit">Gửi</button>
+  </form>
+</div>
+
+<script>
+const chat = document.getElementById('chat');
+const form = document.getElementById('form');
+const input = document.getElementById('query');
+const sendBtn = document.getElementById('sendBtn');
+
+function addMessage(role, content) {
+  const wrap = document.createElement('div');
+  wrap.className = 'msg ' + role;
+  const bubble = document.createElement('div');
+  bubble.className = 'bubble';
+  bubble.textContent = content;
+  wrap.appendChild(bubble);
+  chat.appendChild(wrap);
+  chat.scrollTop = chat.scrollHeight;
+  return bubble;
+}
+
+function markdownTableToHtml(md) {
+  const lines = md.trim().split('\n').filter(l => l.trim().startsWith('|'));
+  if (lines.length < 2) return null;
+  const rows = lines.map(l => l.split('|').map(c => c.trim()).filter((_, i, arr) => i > 0 && i < arr.length - 1));
+  const header = rows[0];
+  const body = rows.slice(2);
+  let html = '<table><thead><tr>' + header.map(h => `<th>${h}</th>`).join('') + '</tr></thead><tbody>';
+  for (const r of body) {
+    html += '<tr>' + r.map(c => `<td>${c}</td>`).join('') + '</tr>';
+  }
+  html += '</tbody></table>';
+  return html;
+}
+
+function renderBotResult(data) {
+  const wrap = document.createElement('div');
+  wrap.className = 'msg bot';
+
+  const route = data.route || data.mode || 'DAG';
+  const tag = document.createElement('span');
+  tag.className = 'route-tag route-' + route;
+  tag.textContent = route;
+  wrap.appendChild(tag);
+
+  const bubble = document.createElement('div');
+  bubble.className = 'bubble';
+
+  const result = data.result || data;
+  const answerText = result.answer || result.summary || result.markdown || JSON.stringify(result);
+  bubble.textContent = answerText;
+  wrap.appendChild(bubble);
+
+  if (result.markdown && result.markdown.includes('|')) {
+    const tableHtml = markdownTableToHtml(result.markdown);
+    if (tableHtml) {
+      const tableDiv = document.createElement('div');
+      tableDiv.innerHTML = tableHtml;
+      wrap.appendChild(tableDiv);
+    }
+  }
+
+  if (result.sources && result.sources.length) {
+    const src = document.createElement('div');
+    src.className = 'sources';
+    src.innerHTML = 'Nguồn: ' + result.sources.map(s => `<span>${s.file}${s.page ? ', trang ' + s.page : ''}</span>`).join('');
+    wrap.appendChild(src);
+  }
+
+  if (result.sql) {
+    const meta = document.createElement('div');
+    meta.className = 'meta';
+    meta.textContent = 'SQL: ' + result.sql;
+    wrap.appendChild(meta);
+  }
+
+  chat.appendChild(wrap);
+  chat.scrollTop = chat.scrollHeight;
+}
+
+async function sendQuery(q) {
+  if (!q.trim()) return;
+  addMessage('user', q);
+  input.value = '';
+  sendBtn.disabled = true;
+  const loadingBubble = addMessage('bot', 'Đang xử lý...');
+  loadingBubble.classList.add('loading');
+
+  try {
+    const res = await fetch('/chat', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ query: q })
+    });
+    const data = await res.json();
+    loadingBubble.parentElement.remove();
+    if (!res.ok) {
+      addMessage('bot', 'Lỗi: ' + (data.detail || res.statusText));
+    } else {
+      renderBotResult(data);
+    }
+  } catch (err) {
+    loadingBubble.parentElement.remove();
+    addMessage('bot', 'Lỗi kết nối: ' + err.message);
+  } finally {
+    sendBtn.disabled = false;
+    input.focus();
+  }
+}
+
+form.addEventListener('submit', (e) => {
+  e.preventDefault();
+  sendQuery(input.value);
+});
+
+document.getElementById('examples').addEventListener('click', (e) => {
+  const btn = e.target.closest('.example');
+  if (btn) sendQuery(btn.dataset.q);
+});
+
+addMessage('bot', 'Xin chào! Hỏi tôi về doanh thu, sản phẩm, chính sách công ty, hoặc nhờ tính toán — hệ thống sẽ tự động chọn đúng nguồn dữ liệu.');
+</script>
+</body>
+</html>

@@ -12,7 +12,10 @@
       "name": "Webhook RAG",
       "type": "n8n-nodes-base.webhook",
       "typeVersion": 2,
-      "position": [240, 300],
+      "position": [
+        240,
+        300
+      ],
       "webhookId": "rag-docs-webhook"
     },
     {
@@ -39,7 +42,10 @@
       "name": "Set Query",
       "type": "n8n-nodes-base.set",
       "typeVersion": 3.4,
-      "position": [460, 300]
+      "position": [
+        460,
+        300
+      ]
     },
     {
       "parameters": {
@@ -63,17 +69,23 @@
       "name": "Retrieve Chunks",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
-      "position": [680, 300]
+      "position": [
+        680,
+        300
+      ]
     },
     {
       "parameters": {
-        "jsCode": "const query = $('Set Query').first().json.query;\nconst payload = $input.first().json;\nconst results = payload.results ?? [];\n\nif (!results.length) {\n  return {\n    query,\n    context: '',\n    sources: [],\n    hasContext: false\n  };\n}\n\nconst contextParts = results.map((r, i) => {\n  const src = r.metadata?.file ?? r.file ?? 'unknown';\n  const page = r.metadata?.page ?? r.page ?? '?';\n  const text = r.text ?? r.content ?? '';\n  return `[${i + 1}] (${src}, trang ${page})\\n${text}`;\n});\n\nconst sources = results.map(r => ({\n  file: r.metadata?.file ?? r.file ?? 'unknown',\n  page: r.metadata?.page ?? r.page ?? null,\n  score: r.score ?? null\n}));\n\nreturn {\n  query,\n  context: contextParts.join('\\n\\n---\\n\\n'),\n  sources,\n  hasContext: true\n};"
+        "jsCode": "const query = $('Set Query').first().json.query;\nconst payload = $input.first().json;\nconst results = payload.results ?? [];\n\nif (!results.length) {\n  return {\n    query,\n    context: '',\n    sources: [],\n    hasContext: false\n  };\n}\n\nconst contextParts = results.map((r, i) => {\n  const src = r.metadata?.file ?? r.file ?? 'unknown';\n  const page = r.metadata?.page ?? r.page ?? '?';\n  const text = r.text ?? r.content ?? '';\n  return `[${i + 1}] (${src}, trang ${page})\\n${text}`;\n});\n\nconst sources = results.map(r => ({\n  file: r.metadata?.file ?? r.file ?? 'unknown',\n  page: r.metadata?.page ?? r.page ?? null,\n  score: r.score ?? null\n}));\n\nreturn {\n  query,\n  context: JSON.stringify(contextParts.join('\\n\\n---\\n\\n')).slice(1, -1),\n  sources,\n  hasContext: true\n};"
       },
       "id": "44444444-5555-4666-8777-888888888804",
       "name": "Build Context",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
-      "position": [900, 300]
+      "position": [
+        900,
+        300
+      ]
     },
     {
       "parameters": {
@@ -99,7 +111,10 @@
       "name": "Groq Answer",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
-      "position": [1120, 300],
+      "position": [
+        1120,
+        300
+      ],
       "credentials": {
         "httpHeaderAuth": {
           "id": "GROQ_API_CREDENTIAL_ID",
@@ -115,7 +130,10 @@
       "name": "Prepare Response",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
-      "position": [1340, 300]
+      "position": [
+        1340,
+        300
+      ]
     },
     {
       "parameters": {
@@ -127,7 +145,10 @@
       "name": "Respond to Webhook",
       "type": "n8n-nodes-base.respondToWebhook",
       "typeVersion": 1.1,
-      "position": [1560, 300]
+      "position": [
+        1560,
+        300
+      ]
     }
   ],
   "connections": {

@@ -1,4 +1,6 @@
 import ast
+import contextlib
+import io
 import threading
 from typing import Any
 
@@ -29,7 +31,8 @@ def validate_code(code: str) -> None:
             raise SandboxError(f"Thuộc tính không cho phép: {node.attr}")
 
 
-def _run_code(code: str, local_vars: dict[str, Any], error_box: list[str]) -> None:
+def _run_code(code: str, local_vars: dict[str, Any], error_box: list[str], stdout_box: list[str]) -> None:
+    stdout = io.StringIO()
     try:
         safe_builtins = {
             "abs": abs,
@@ -47,17 +50,21 @@ def _run_code(code: str, local_vars: dict[str, Any], error_box: list[str]) -> No
             "tuple": tuple,
             "print": print,
         }
-        exec(compile(code, "<sandbox>", "exec"), {"__builtins__": safe_builtins}, local_vars)
+        with contextlib.redirect_stdout(stdout):
+            exec(compile(code, "<sandbox>", "exec"), {"__builtins__": safe_builtins}, local_vars)
     except Exception as exc:
         error_box.append(str(exc))
+    finally:
+        stdout_box.append(stdout.getvalue())
 
 
 def execute_python(code: str, timeout: int = 10) -> dict:
     validate_code(code)
     local_vars: dict[str, Any] = {}
     error_box: list[str] = []
+    stdout_box: list[str] = []
 
-    thread = threading.Thread(target=_run_code, args=(code, local_vars, error_box))
+    thread = threading.Thread(target=_run_code, args=(code, local_vars, error_box, stdout_box))
     thread.start()
     thread.join(timeout)
 
@@ -66,5 +73,8 @@ def execute_python(code: str, timeout: int = 10) -> dict:
     if error_box:
         return {"success": False, "error": error_box[0]}
 
+    stdout = stdout_box[0] if stdout_box else ""
     result = local_vars.get("result", local_vars.get("ket_qua"))
-    return {"success": True, "result": result, "stdout": str(result)}
+    if result is None and stdout.strip():
+        result = stdout.strip().splitlines()[-1]
+    return {"success": True, "result": result, "stdout": stdout}
