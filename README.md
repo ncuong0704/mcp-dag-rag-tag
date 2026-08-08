@@ -1,3 +1,14 @@
+
+<p align="center">
+  <a href="https://www.youtube.com/watch?v=7MIa2zYui7w">
+    <img src="https://img.youtube.com/vi/7MIa2zYui7w/maxresdefault.jpg" alt="Xem demo trên YouTube" width="600">
+  </a>
+</p>
+
+<p align="center">
+  <strong>📺 <a href="https://www.youtube.com/watch?v=7MIa2zYui7w">Xem video demo trên YouTube</a></strong>
+</p>
+
 # MCP Final Project — Chatbot Doanh Nghiệp (DAG / RAG / TAG)
 
 Dự án cuối khóa **Model Context Protocol (MCP)** xây dựng chatbot doanh nghiệp tổng hợp, kết hợp ba biến thể:
